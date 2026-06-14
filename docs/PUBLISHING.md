@@ -33,6 +33,23 @@ dist/BotCom Workbench-0.1.0-arm64.dmg
 
 Use `gh auth login` or a personal access token. Do not use or share your GitHub password.
 
+Recommended:
+
+```bash
+gh auth login -h github.com -p https -w
+npm run release:github
+```
+
+Alternative with a short-lived personal access token:
+
+```bash
+export GH_TOKEN=...
+npm run release:github
+unset GH_TOKEN
+```
+
+`npm run release:github` runs `npm run release:check` before pushing.
+
 Create and push a public repository:
 
 ```bash

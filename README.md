@@ -108,6 +108,13 @@ Run the full release gate:
 npm run release:check
 ```
 
+Publish to GitHub after authenticating `gh`:
+
+```bash
+gh auth login -h github.com -p https -w
+npm run release:github
+```
+
 ## Configuration
 
 BotCom Workbench is local-first. By default it uses:
@@ -200,6 +207,7 @@ Dry-run output redacts review tokens. Real notifications keep the review URL int
 - Review tokens are read locally and not exposed through the dashboard API.
 - Webhook secrets are read from local environment files and not printed.
 - Build artifacts, runtime files, `.env`, `node_modules`, and `dist` are ignored.
+- GitHub publishing uses `gh` OAuth or `GH_TOKEN`; passwords are not supported and should not be used.
 
 See `docs/SECURITY.md`.
 

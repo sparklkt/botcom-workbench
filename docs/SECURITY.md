@@ -43,9 +43,30 @@ Never commit:
 
 - platform API keys;
 - platform access tokens;
+- GitHub personal access tokens;
+- passwords;
 - webhook URLs;
 - review server tokens;
 - generated mobile review links.
+
+GitHub no longer supports password authentication for Git or `gh` publishing. Use browser OAuth via:
+
+```bash
+gh auth login -h github.com -p https -w
+```
+
+or a short-lived `GH_TOKEN`/`GITHUB_TOKEN`. Do not paste account passwords into shell commands, documentation, issues, or chat logs.
+
+## AI profile storage
+
+Model/API profiles are stored locally under:
+
+```text
+~/.botcom-workbench/ai-profiles.json
+~/.botcom-workbench/ai-env/
+```
+
+The dashboard API returns only `apiKeySet` and a short masked preview. Raw keys are used only inside local env scripts with `0600` permissions.
 
 ## Desktop distribution
 
