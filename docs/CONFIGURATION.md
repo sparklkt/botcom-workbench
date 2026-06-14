@@ -108,3 +108,15 @@ $BOTCOM_ADAPTERS_ROOT
 ```
 
 Each file should describe one business module such as CRM, revenue, delivery, assets, or automation. See `examples/adapters/` and `docs/INTEGRATION.md`.
+
+## First-run setup wizard
+
+The desktop app includes **One-click setup**. It creates only missing files under:
+
+```text
+$BOTCOM_HOME
+$BOTCOM_WORKBENCH_ROOT
+$BOTCOM_ADAPTERS_ROOT
+```
+
+It does not overwrite existing files. It copies example adapters from `examples/adapters/` and creates starter Markdown files for strategy, content, customer, delivery, revenue, assets, and automation.

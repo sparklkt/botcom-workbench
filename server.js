@@ -736,6 +736,92 @@ async function aiLaunchCommand(body) {
     profile: sanitizeAiProfile(p),
   };
 }
+async function copyIfMissing(src, dest) {
+  try {
+    await fsp.access(dest);
+    return { path: dest, created: false };
+  } catch { /* create below */ }
+  await fsp.mkdir(path.dirname(dest), { recursive: true });
+  await fsp.copyFile(src, dest);
+  return { path: dest, created: true };
+}
+async function writeTextIfMissing(dest, text) {
+  try {
+    await fsp.access(dest);
+    return { path: dest, created: false };
+  } catch { /* create below */ }
+  await fsp.mkdir(path.dirname(dest), { recursive: true });
+  await fsp.writeFile(dest, text, 'utf8');
+  return { path: dest, created: true };
+}
+function setupStarterFiles() {
+  const wb = BOTCOM_ROOTS.workbench;
+  return [
+    ['00_Start_Here.md', `# Start here
+
+This is your local one-person company workspace.
+
+Suggested first steps:
+
+1. Define your positioning and offer in \`01_Strategy/ICP_and_offer.md\`.
+2. Use BotCom OS to review acquisition, content, customer, delivery, revenue, assets, and automation status.
+3. Configure model/API profiles from the desktop app before asking agents to work.
+4. Keep credentials out of this folder unless they are in a local ignored/private file.
+`],
+    ['01_Strategy/ICP_and_offer.md', `# ICP and offer
+
+## Target customer
+
+## Pain / desire
+
+## Promise
+
+## Offer ladder
+
+## Constraints and non-goals
+`],
+    ['02_Content/README.md', '# Content\n\nIdeas, scripts, posts, thumbnails, video plans, and publishing notes.\n'],
+    ['03_Customers/README.md', '# Customers\n\nLeads, customer notes, community follow-up, and support summaries.\n'],
+    ['04_Delivery/README.md', '# Delivery\n\nClient/project delivery plans, SOPs, acceptance evidence, and reusable templates.\n'],
+    ['05_Revenue/README.md', '# Revenue\n\nProducts, offers, invoices, affiliate/commerce revenue, costs, and P&L exports.\n'],
+    ['06_Assets/README.md', '# Assets\n\nPrompts, brand assets, examples, datasets, generated media, and knowledge base material.\n'],
+    ['07_Automation/README.md', '# Automation\n\nRecurring workflows, scripts, agent instructions, review policies, and retrospectives.\n'],
+  ].map(([rel, text]) => ({ rel, path: path.join(wb, rel), text }));
+}
+async function botcomSetupStatus() {
+  const adapters = await readOperatingAdapters();
+  const starter = setupStarterFiles();
+  return {
+    ok: true,
+    roots: { home: BOTCOM_HOME, workbench: BOTCOM_ROOTS.workbench, adapters: BOTCOM_ROOTS.adapters, mediaOps: BOTCOM_ROOTS.mediaOps },
+    exists: {
+      home: fileStatSafe(BOTCOM_HOME).exists,
+      workbench: fileStatSafe(BOTCOM_ROOTS.workbench).exists,
+      adapters: fileStatSafe(BOTCOM_ROOTS.adapters).exists,
+      mediaOps: fileStatSafe(BOTCOM_ROOTS.mediaOps).exists,
+    },
+    adapters: { count: adapters.count, errors: adapters.errors },
+    starterFiles: starter.map((x) => ({ rel: x.rel, exists: fileStatSafe(x.path).exists })),
+  };
+}
+async function botcomSetupAction(body) {
+  const action = safeText(body && body.action || 'initialize', 40);
+  if (action !== 'initialize') return { ok: false, error: 'invalid setup action' };
+  const made = [];
+  await fsp.mkdir(BOTCOM_HOME, { recursive: true }); made.push({ type: 'dir', path: BOTCOM_HOME });
+  await fsp.mkdir(BOTCOM_ROOTS.workbench, { recursive: true }); made.push({ type: 'dir', path: BOTCOM_ROOTS.workbench });
+  await fsp.mkdir(BOTCOM_ROOTS.adapters, { recursive: true }); made.push({ type: 'dir', path: BOTCOM_ROOTS.adapters });
+  for (const f of setupStarterFiles()) made.push({ type: 'file', ...(await writeTextIfMissing(f.path, f.text)) });
+  const exampleDir = path.join(__dirname, 'examples', 'adapters');
+  try {
+    const files = (await fsp.readdir(exampleDir)).filter((f) => f.endsWith('.json'));
+    for (const f of files) made.push({ type: 'adapter', ...(await copyIfMissing(path.join(exampleDir, f), path.join(BOTCOM_ROOTS.adapters, f))) });
+  } catch (err) {
+    made.push({ type: 'warning', path: exampleDir, error: safeText(err.message, 120) });
+  }
+  const status = await botcomSetupStatus();
+  return { ok: true, made, status };
+}
 
 // 最近几次整理日志的一句话摘要，给 agent 当历史参照（日志由 agent 按 brief 约定写入）
 async function organizeHistory() {
@@ -2531,6 +2617,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/botcom/ai-launch' && req.method === 'POST') {
       return sendJSON(res, 200, await aiLaunchCommand(await readBody(req)));
+    }
+    if (p === '/api/botcom/setup') {
+      if (req.method === 'POST') return sendJSON(res, 200, await botcomSetupAction(await readBody(req)));
+      return sendJSON(res, 200, await botcomSetupStatus());
     }
     if (p === '/api/list') {
       return sendJSON(res, 200, await listDir(qp.get('path') || HOME));

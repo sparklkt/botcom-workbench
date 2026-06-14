@@ -2234,6 +2234,7 @@ const botcomDashboard = {
         <button class="primary" data-open-mobile>手机审批台</button>
         <button data-copy-mobile>复制手机审批链接</button>
         <button data-open-qr>打开二维码</button>
+        <button data-open-setup>一键初始化</button>
         <button data-nav-media>打开内容运营中台</button>
         <button data-open-workbench>打开 AI-Workbench</button>
       </div>
@@ -2276,6 +2277,7 @@ const botcomDashboard = {
     body.querySelector('[data-open-mobile]')?.addEventListener('click', () => this.openUrl(m.mobile?.primaryUrl));
     body.querySelector('[data-copy-mobile]')?.addEventListener('click', () => this.copy(m.mobile?.primaryUrl, '已复制手机审批链接'));
     body.querySelector('[data-open-qr]')?.addEventListener('click', () => (m.mobile?.qr ? openWith(m.mobile.qr, 'default') : toast('二维码未生成', true)));
+    body.querySelector('[data-open-setup]')?.addEventListener('click', () => { if (this.ov) this.ov.remove(); this.ov = null; setupWizard.show(); });
     body.querySelector('[data-nav-media]')?.addEventListener('click', () => {
       if (!m.path || !m.exists) return toast('内容运营中台未配置', true);
       if (this.ov) this.ov.remove(); this.ov = null; navigate(m.path);
@@ -2338,6 +2340,7 @@ const aiGuide = {
         </section>
         <div class="botcom-actions">
           <button class="primary" data-open-ai-settings>配置模型 / API</button>
+          <button data-open-setup>一键初始化</button>
           <button data-open-botcom>打开 BotCom OS</button>
           <button data-launch-claude>启动 Claude Code</button>
           <button data-launch-codex>启动 Codex</button>
@@ -2349,6 +2352,7 @@ const aiGuide = {
     ov.onclick = (ev) => { if (ev.target === ov) close(); };
     ov.querySelector('[data-close]').onclick = close;
     ov.querySelector('[data-open-ai-settings]').onclick = () => { close(); aiSettings.show(); };
+    ov.querySelector('[data-open-setup]').onclick = () => { close(); setupWizard.show(); };
     ov.querySelector('[data-open-botcom]').onclick = () => { close(); botcomDashboard.show(); };
     ov.querySelector('[data-launch-claude]').onclick = () => term.launchAgent('claude --dangerously-skip-permissions');
     ov.querySelector('[data-launch-codex]').onclick = () => term.launchAgent('codex');
@@ -2472,6 +2476,103 @@ const aiSettings = {
       navigator.clipboard?.writeText(r.cmd);
       toast('网页环境没有内嵌终端，已复制命令');
     }
+  },
+};
+
+// ---------- 新手一键初始化：创建本地工作台和示例经营模块 ----------
+const setupWizard = {
+  ov: null, data: null,
+  async show() {
+    if (this.ov) this.ov.remove();
+    const ov = document.createElement('div');
+    this.ov = ov;
+    ov.className = 'input-overlay botcom-overlay';
+    ov.innerHTML = `<div class="input-dialog botcom-dialog setup-dialog">
+      <div class="botcom-head">
+        <div>
+          <div class="botcom-kicker">FIRST RUN SETUP</div>
+          <div class="input-title">一键初始化本地工作台</div>
+        </div>
+        <div class="botcom-head-actions">
+          <button class="ghost-btn" data-refresh>刷新</button>
+          <button class="ghost-btn" data-close>关闭</button>
+        </div>
+      </div>
+      <div class="botcom-body"><div class="cmdk-loading">读取初始化状态…</div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = () => { if (this.ov) this.ov.remove(); this.ov = null; };
+    ov.onclick = (ev) => { if (ev.target === ov) close(); };
+    ov.querySelector('[data-close]').onclick = close;
+    ov.querySelector('[data-refresh]').onclick = () => this.refresh();
+    await this.refresh();
+  },
+  async refresh() {
+    const body = this.ov && this.ov.querySelector('.botcom-body');
+    if (!body) return;
+    body.innerHTML = '<div class="cmdk-loading">刷新初始化状态…</div>';
+    this.data = await api('/api/botcom/setup').catch((err) => ({ ok: false, error: err.message }));
+    this.render();
+  },
+  statusLine(label, ok, detail) {
+    return `<div class="setup-status ${ok ? 'good' : 'warn'}"><b>${escapeHtml(label)}</b><span>${ok ? '已就绪' : '未创建'}</span><em>${escapeHtml(detail || '')}</em></div>`;
+  },
+  render() {
+    const body = this.ov && this.ov.querySelector('.botcom-body');
+    if (!body) return;
+    const d = this.data || {};
+    if (!d.ok) {
+      body.innerHTML = `<div class="empty-state">初始化状态读取失败：${escapeHtml(d.error || 'unknown')}</div>`;
+      return;
+    }
+    const starterReady = (d.starterFiles || []).filter((x) => x.exists).length;
+    body.innerHTML = `
+      <section class="botcom-card ai-guide-hero">
+        <div class="botcom-card-title">它会做什么</div>
+        <div class="ai-guide-big">创建一个本地的一人公司工作台，不覆盖已有文件。</div>
+        <div class="botcom-sub">会创建工作台目录、策略/内容/客户/交付/收入/资产/自动化模板，并复制 CRM / 交付 / 收入示例 adapters。API Key 仍需要你在“模型 / API”里自己录入。</div>
+      </section>
+      <section class="botcom-card">
+        <div class="botcom-card-title">当前状态</div>
+        ${this.statusLine('BotCom Home', d.exists?.home, d.roots?.home)}
+        ${this.statusLine('AI-Workbench', d.exists?.workbench, d.roots?.workbench)}
+        ${this.statusLine('Adapters', d.exists?.adapters, `${d.roots?.adapters || ''} · ${d.adapters?.count || 0} connected`)}
+        <div class="setup-status ${starterReady ? 'good' : 'warn'}"><b>Starter files</b><span>${starterReady}/${(d.starterFiles || []).length}</span><em>策略、内容、客户、交付、收入、资产、自动化模板</em></div>
+      </section>
+      <div class="botcom-actions">
+        <button class="primary" data-run-setup>一键初始化 / 补齐缺失项</button>
+        <button data-open-ai-settings>下一步：配置模型 / API</button>
+        <button data-open-botcom>打开 BotCom OS</button>
+      </div>
+      <section class="botcom-card">
+        <div class="botcom-card-title">新手不用理解的细节</div>
+        <div class="botcom-list">
+          <div>所有文件都在本机默认路径 <span class="mono">${escapeHtml(d.roots?.home || '')}</span>，不是云端 SaaS。</div>
+          <div>示例 adapters 只是演示经营模块怎么亮起来，不包含真实客户或账号数据。</div>
+          <div>后续你可以把表格、CRM、收入记录导出成小 JSON，BotCom OS 会把它们显示在经营地图里。</div>
+        </div>
+      </section>
+      <div class="setup-result"></div>
+    `;
+    body.querySelector('[data-run-setup]').onclick = () => this.run();
+    body.querySelector('[data-open-ai-settings]').onclick = () => { if (this.ov) this.ov.remove(); this.ov = null; aiSettings.show(); };
+    body.querySelector('[data-open-botcom]').onclick = () => { if (this.ov) this.ov.remove(); this.ov = null; botcomDashboard.show(); };
+  },
+  async run() {
+    const body = this.ov && this.ov.querySelector('.botcom-body');
+    const result = body && body.querySelector('.setup-result');
+    if (result) result.innerHTML = '<div class="cmdk-loading">正在初始化本地工作台…</div>';
+    const r = await apiPost('/api/botcom/setup', { action: 'initialize' }).catch((err) => ({ ok: false, error: err.message }));
+    if (!r.ok) {
+      if (result) result.innerHTML = `<div class="botcom-issue bad"><b>初始化失败</b><span>${escapeHtml(r.error || 'unknown')}</span></div>`;
+      return;
+    }
+    const created = (r.made || []).filter((x) => x.created).length;
+    if (result) {
+      result.innerHTML = `<section class="botcom-card"><div class="botcom-card-title">初始化完成</div><div class="botcom-ok">已补齐 ${created} 个缺失项；已有文件保持不变。</div></section>`;
+    }
+    toast('本地工作台已初始化');
+    await this.refresh();
   },
 };
 
@@ -2603,6 +2704,7 @@ function bindEvents() {
   shotTray.init();
   $('#ai-guide-entry').onclick = () => aiGuide.show();
   $('#ai-settings-entry').onclick = () => aiSettings.show();
+  $('#setup-entry').onclick = () => setupWizard.show();
   $('#skills-entry').onclick = () => skillsView.show();
   $('#botcom-entry').onclick = () => botcomDashboard.show();
   $('#term-newtab').onclick = () => term.newTab();

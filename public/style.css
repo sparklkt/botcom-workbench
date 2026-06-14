@@ -933,6 +933,17 @@ kbd {
 .ai-profile textarea { margin-top: 9px; min-height: 64px; resize: vertical; }
 .ai-profile-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .ai-profile-actions .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
+.setup-status {
+  display: grid; grid-template-columns: 150px 86px 1fr; gap: 10px; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.setup-status:last-child { border-bottom: none; }
+.setup-status b { color: var(--text); }
+.setup-status span { font-weight: 800; color: var(--text-dim); }
+.setup-status em { color: var(--text-faint); font-style: normal; overflow-wrap: anywhere; }
+.setup-status.good span { color: #3fb950; }
+.setup-status.warn span { color: #d99a2b; }
+.setup-result { margin-top: 12px; }
 .botcom-issue { border-left: 3px solid var(--border); padding: 7px 0 8px 10px; margin: 8px 0; }
 .botcom-issue.bad { border-color: #d4453a; }
 .botcom-issue.warn { border-color: #d99a2b; }
@@ -981,6 +992,7 @@ kbd {
   .botcom-grid, .botcom-two { grid-template-columns: 1fr; }
   .botcom-module-grid { grid-template-columns: 1fr 1fr; }
   .ai-terms-grid, .ai-form-grid { grid-template-columns: 1fr 1fr; }
+  .setup-status { grid-template-columns: 1fr; gap: 3px; }
   .botcom-qrow { grid-template-columns: 1fr; }
   .botcom-qactions { min-width: 0; }
 }

@@ -17,6 +17,7 @@
     "botcom:status": "python3 botcom/comms_bridge.py --status --channel all --dry-run",
     "botcom:notify": "python3 botcom/comms_bridge.py --status --channel all",
     "check:vendor-patch": "grep -q '20===e.keyCode||229===e.keyCode' public/vendor/xterm/xterm.js",
+    "release:check": "bash scripts/release_gate.sh",
     "predist": "npm run check:vendor-patch",
     "dist": "electron-builder --mac"
   },

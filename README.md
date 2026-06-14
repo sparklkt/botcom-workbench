@@ -53,6 +53,7 @@ Core operating modules:
   - service health, blockers, next actions, and review suggestions.
 - AI beginner guide explaining agents, skills, models, API keys, context, and approval queues.
 - Model / API profile panel for Claude Code, Codex, Anthropic, OpenAI-compatible, and DeepSeek-style setups.
+- First-run setup wizard that creates a local one-person company workspace and example operating adapters without overwriting existing files.
 - Review queue API integration:
   - `GET /api/botcom/status`
   - `GET /api/botcom/review-state`
@@ -101,6 +102,12 @@ Run smoke checks:
 npm run botcom:smoke
 ```
 
+Run the full release gate:
+
+```bash
+npm run release:check
+```
+
 ## Configuration
 
 BotCom Workbench is local-first. By default it uses:
@@ -123,6 +130,16 @@ npm run app
 ```
 
 See `.env.example` and `docs/CONFIGURATION.md`.
+
+## First-run setup
+
+Open the desktop app and click **One-click setup**. It creates:
+
+- `~/BotCom/AI-Workbench` with beginner-friendly strategy, content, customer, delivery, revenue, asset, and automation starter files;
+- `~/BotCom/adapters` with example CRM, delivery, and revenue adapters;
+- no cloud account and no credential files.
+
+Existing files are kept unchanged.
 
 ## AI tools and model profiles
 
@@ -192,6 +209,7 @@ See `docs/SECURITY.md`.
 - `docs/CONFIGURATION.md`
 - `docs/INTEGRATION.md`
 - `docs/ONE_PERSON_COMPANY_OS.md`
+- `docs/PUBLISHING.md`
 - `docs/SECURITY.md`
 - `docs/ROADMAP.md`
 - `CONTRIBUTING.md`
