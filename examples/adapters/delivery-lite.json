@@ -1,0 +1,30 @@
+{
+  "id": "delivery-lite",
+  "name": "Delivery Lite",
+  "module": "delivery",
+  "tone": "good",
+  "metric": "4 active projects",
+  "description": "Project delivery tracker for client work, SOPs, and acceptance evidence.",
+  "next": "Turn the most repeated delivery task into a checklist or skill.",
+  "updated_at": "2026-06-14T12:00:00Z",
+  "counts": {
+    "active_projects": 4,
+    "waiting_review": 1,
+    "templates": 6
+  },
+  "queue": {
+    "rows": 4,
+    "review": 1,
+    "blocked": 0
+  },
+  "next_actions": [
+    "Review the one waiting delivery item.",
+    "Convert the latest accepted project into a reusable template."
+  ],
+  "links": [
+    {
+      "label": "Delivery workspace",
+      "path": "~/BotCom/delivery"
+    }
+  ]
+}

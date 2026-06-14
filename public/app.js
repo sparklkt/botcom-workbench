@@ -2070,6 +2070,18 @@ const botcomDashboard = {
   moduleTone(tone) {
     return tone === 'good' || tone === 'warn' || tone === 'bad' ? tone : 'warn';
   },
+  mergeAdapterModule(id, fallback) {
+    const mod = this.data?.operatingAdapters?.modules?.[id];
+    if (!mod || !mod.connected) return fallback;
+    return {
+      ...fallback,
+      tone: mod.tone || fallback.tone,
+      metric: mod.metric || fallback.metric,
+      next: mod.next || fallback.next,
+      adapters: mod.adapters || [],
+      queue: mod.queue || fallback.queue,
+    };
+  },
   companyModules(m, w, lr, growth, queue, services) {
     const existsMedia = !!m.exists;
     const existsWorkbench = !!w.exists;
@@ -2081,67 +2093,77 @@ const botcomDashboard = {
     const reviewRunning = !!(services.review && services.review.running);
     const workerRunning = !!(services.worker && services.worker.running);
     return [
-      {
+      this.mergeAdapterModule('positioning', {
+        id: 'positioning',
         name: '定位 / 产品',
         tone: existsWorkbench ? 'warn' : 'bad',
         metric: existsWorkbench ? '待结构化' : '未配置',
         desc: '赛道、目标人群、主张、产品梯度和约束边界。',
         next: existsWorkbench ? '把战略假设沉淀成可版本化的 offer / ICP 文档。' : '先配置公司工作台根目录。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('acquisition', {
+        id: 'acquisition',
         name: '获客 / 增长',
         tone: rows || channels ? 'good' : (existsMedia ? 'warn' : 'bad'),
         metric: `${channels || 0} 渠道`,
         desc: '平台入口、趋势捕捉、线索池、实验假设和转化路径。',
         next: rows ? '按渠道读取审核队列并推进增长实验。' : '接入内容获客或线索采集适配器。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('content', {
+        id: 'content',
         name: '内容 / 分发',
         tone: rows ? 'good' : (existsMedia ? 'warn' : 'bad'),
         metric: `${rows} 条待审`,
         desc: '选题、脚本、图文、视频、发布准备和平台差异化。',
         next: rows ? '优先处理待审内容，形成稳定发文节奏。' : '生成第一批可审核内容包。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('customer', {
+        id: 'customer',
         name: '客户 / 社群',
         tone: 'warn',
         metric: '待接入',
         desc: '私域入口、评论私信、客户标签、跟进提醒和复购。',
         next: '规划 CRM / 飞书 / 微信入口，只同步必要字段。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('delivery', {
+        id: 'delivery',
         name: '交付 / 项目',
         tone: existsWorkbench ? 'good' : 'bad',
         metric: `${w.active || 0} 项资产`,
         desc: '客户项目、交付模板、SOP、验收标准和复盘记录。',
         next: existsWorkbench ? '把高频交付沉淀为模板和检查清单。' : '创建交付资产库。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('revenue', {
+        id: 'revenue',
         name: '收入 / 商业化',
         tone: growthSignals ? 'warn' : 'bad',
         metric: growthSignals ? '有复盘' : '无数据',
         desc: '产品矩阵、带货/服务/订阅、报价、成本和回款。',
         next: '接入订单/佣金/成本表，形成最小 P&L 看板。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('assets', {
+        id: 'assets',
         name: '资产 / 知识库',
         tone: existsWorkbench ? 'good' : 'bad',
         metric: `${w.items || 0} 文件`,
         desc: '提示词、素材、案例、研究、脚本、品牌资产和数据集。',
         next: existsWorkbench ? '持续去重、打标签、形成可调用资产。' : '配置 AI-Workbench 或等价资产库。',
-      },
-      {
+      }),
+      this.mergeAdapterModule('automation', {
+        id: 'automation',
         name: '自动化 / 复盘',
         tone: (reviewRunning || workerRunning || growthSignals) ? 'good' : (warnings || blockers ? 'warn' : 'bad'),
         metric: `${reviewRunning + workerRunning} 服务`,
         desc: '审批、发布准备、通知、指标回收、A/B 测试和周复盘。',
         next: workerRunning ? '保持人工审核闸门，逐步扩大自动化范围。' : '先启动审核台，再接发布准备 worker。',
-      },
+      }),
     ];
   },
   moduleMapSection(modules) {
+    const connected = modules.reduce((n, x) => n + ((x.adapters || []).length ? 1 : 0), 0);
     return `<section class="botcom-card botcom-module-section">
       <div class="botcom-card-title">一人公司经营地图 · Eight operating modules</div>
+      <div class="botcom-sub">本地适配器驱动：${connected}/8 个经营模块已接入；未接入模块使用默认工作台 / media-ops 信号推断。</div>
       <div class="botcom-module-grid">
         ${modules.map((x) => `<article class="botcom-module ${this.moduleTone(x.tone)}">
           <div class="botcom-module-head">
@@ -2149,6 +2171,7 @@ const botcomDashboard = {
             <span>${escapeHtml(x.metric)}</span>
           </div>
           <p>${escapeHtml(x.desc)}</p>
+          ${(x.adapters || []).length ? `<div class="botcom-adapter-chips">${x.adapters.slice(0, 3).map((a) => `<small class="${this.moduleTone(a.tone)}">${escapeHtml(a.name)}${a.metric ? ` · ${escapeHtml(a.metric)}` : ''}</small>`).join('')}</div>` : ''}
           <em>${escapeHtml(x.next)}</em>
         </article>`).join('')}
       </div>
@@ -2164,6 +2187,7 @@ const botcomDashboard = {
     const growth = m.growth || {};
     const queue = m.queue || {};
     const services = m.services || {};
+    const op = d.operatingAdapters || {};
     const blockers = lr.blockers || [];
     const warnings = lr.warnings || [];
     const next = lr.next_actions || [];
@@ -2184,6 +2208,7 @@ const botcomDashboard = {
             ${this.pill(`阻塞 ${lr.counts?.block || 0}`, blockers.length ? 'block' : 'pass')}
           </div>
           <div class="botcom-sub">一人公司 OS：定位、获客、内容、客户、交付、收入、资产、自动化复盘。当前 media-ops 是内容获客模块。</div>
+          <div class="botcom-sub mono">Adapters: ${escapeHtml(this.shortPath(op.path || ''))}</div>
         </section>
         <section class="botcom-card">
           <div class="botcom-card-title">内容队列</div>
@@ -2200,6 +2225,7 @@ const botcomDashboard = {
           <div class="botcom-card-title">公司资产</div>
           <div class="botcom-num">${w.items || 0}</div>
           <div class="botcom-sub">active=${w.active || 0} · missing=${w.missing || 0}</div>
+          <div class="botcom-sub">适配器=${op.count || 0} · errors=${(op.errors || []).length}</div>
           <div class="botcom-sub">敏感区隔离：${w.sensitiveExcluded ? '已发现并排除上传' : '未发现'}</div>
         </section>
       </div>
@@ -2266,6 +2292,189 @@ const botcomDashboard = {
   },
 };
 
+// ---------- AI 入门：给第一次使用 AI 工具的人 ----------
+const aiGuide = {
+  ov: null,
+  show() {
+    if (this.ov) this.ov.remove();
+    const ov = document.createElement('div');
+    this.ov = ov;
+    ov.className = 'input-overlay botcom-overlay';
+    ov.innerHTML = `<div class="input-dialog botcom-dialog ai-guide-dialog">
+      <div class="botcom-head">
+        <div>
+          <div class="botcom-kicker">AI ONBOARDING</div>
+          <div class="input-title">5 分钟上手：AI 员工、技能和模型</div>
+        </div>
+        <div class="botcom-head-actions"><button class="ghost-btn" data-close>关闭</button></div>
+      </div>
+      <div class="botcom-body">
+        <section class="botcom-card ai-guide-hero">
+          <div class="botcom-card-title">先记住一句话</div>
+          <div class="ai-guide-big">你是老板；Agent 是 AI 员工；Skill 是员工的专业技能；模型/API 是员工的大脑和电费。</div>
+          <div class="botcom-sub">BotCom Workbench 的目标不是让普通人学一堆命令，而是把复杂 AI 工具收进一个可审核、可回放、可配置的工作台。</div>
+        </section>
+        <div class="ai-terms-grid">
+          ${[
+            ['Agent', 'AI 员工', '可以对话、读文件、写代码、整理资料、生成内容。Claude Code、Codex 都属于可以被派活的 agent。'],
+            ['Skill', '专业技能包', '让 agent 学会某类固定工作，比如做表格、生成视频、控制浏览器、处理邮件。'],
+            ['Model', '大脑', '决定思考能力和成本。强模型适合战略/复杂任务，便宜模型适合批量草稿和分类。'],
+            ['API Key', '钥匙/电费卡', '让工具调用某个模型供应商。Key 只应存在本机，不应该写进公开项目。'],
+            ['Prompt', '任务说明', '你给 AI 的任务要求。好 prompt 要说明目标、素材、约束、输出格式和验收标准。'],
+            ['Context', '上下文', 'AI 能看到的资料。把文件、文件夹、截图、历史记录拖进终端，就是给它上下文。'],
+            ['Review Queue', '审批队列', 'AI 先产出候选稿，老板只审关键项：发布、花钱、对客户承诺、不可逆操作。'],
+            ['Workflow', '工作流', '把“研究→生成→审核→执行→复盘”串起来，减少重复劳动。'],
+          ].map(([k, zh, text]) => `<article class="ai-term"><b>${k}</b><span>${zh}</span><p>${text}</p></article>`).join('')}
+        </div>
+        <section class="botcom-card">
+          <div class="botcom-card-title">新手推荐路径</div>
+          <div class="ai-steps">
+            <div><b>1</b><span>先打开“模型 / API”，确认 Claude Code / Codex 是否已安装，录入你自己的 API Key。</span></div>
+            <div><b>2</b><span>打开 BotCom OS，看一人公司 8 个模块：哪个已接入、哪个还缺数据。</span></div>
+            <div><b>3</b><span>从一个低风险任务开始：让 agent 整理文件、总结资料、生成选题，不要一上来自动发布。</span></div>
+            <div><b>4</b><span>把能复用的任务沉淀成 Skill 或提示词模板，让 AI 员工下次直接按 SOP 工作。</span></div>
+            <div><b>5</b><span>所有对外发布、客户承诺、花钱、删数据的动作，先进入审批队列。</span></div>
+          </div>
+        </section>
+        <div class="botcom-actions">
+          <button class="primary" data-open-ai-settings>配置模型 / API</button>
+          <button data-open-botcom>打开 BotCom OS</button>
+          <button data-launch-claude>启动 Claude Code</button>
+          <button data-launch-codex>启动 Codex</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = () => { if (this.ov) this.ov.remove(); this.ov = null; };
+    ov.onclick = (ev) => { if (ev.target === ov) close(); };
+    ov.querySelector('[data-close]').onclick = close;
+    ov.querySelector('[data-open-ai-settings]').onclick = () => { close(); aiSettings.show(); };
+    ov.querySelector('[data-open-botcom]').onclick = () => { close(); botcomDashboard.show(); };
+    ov.querySelector('[data-launch-claude]').onclick = () => term.launchAgent('claude --dangerously-skip-permissions');
+    ov.querySelector('[data-launch-codex]').onclick = () => term.launchAgent('codex');
+  },
+};
+
+// ---------- 模型 / API 配置：本地 profile，密钥不回显 ----------
+const aiSettings = {
+  ov: null, data: null,
+  async show() {
+    if (this.ov) this.ov.remove();
+    const ov = document.createElement('div');
+    this.ov = ov;
+    ov.className = 'input-overlay botcom-overlay';
+    ov.innerHTML = `<div class="input-dialog botcom-dialog ai-settings-dialog">
+      <div class="botcom-head">
+        <div>
+          <div class="botcom-kicker">MODEL & API</div>
+          <div class="input-title">模型 / API 设置</div>
+        </div>
+        <div class="botcom-head-actions">
+          <button class="ghost-btn" data-refresh>刷新</button>
+          <button class="ghost-btn" data-close>关闭</button>
+        </div>
+      </div>
+      <div class="botcom-body"><div class="cmdk-loading">读取本机 AI 工具和 profile…</div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = () => { if (this.ov) this.ov.remove(); this.ov = null; };
+    ov.onclick = (ev) => { if (ev.target === ov) close(); };
+    ov.querySelector('[data-close]').onclick = close;
+    ov.querySelector('[data-refresh]').onclick = () => this.refresh();
+    await this.refresh();
+  },
+  async refresh() {
+    const body = this.ov && this.ov.querySelector('.botcom-body');
+    if (!body) return;
+    body.innerHTML = '<div class="cmdk-loading">刷新 AI profile…</div>';
+    this.data = await api('/api/botcom/ai-profiles').catch((err) => ({ ok: false, error: err.message }));
+    this.render();
+  },
+  toolLine(name, tool) {
+    return `<div class="botcom-service ${tool?.installed ? 'on' : 'off'}"><span>${escapeHtml(name)}</span><b>${tool?.installed ? '已安装' : '未检测到'}${tool?.path ? ` · ${escapeHtml(tool.path)}` : ''}</b></div>`;
+  },
+  profileCard(p) {
+    const providerOptions = ['anthropic', 'openai', 'deepseek', 'custom'].map((x) => `<option value="${x}" ${p.provider === x ? 'selected' : ''}>${x}</option>`).join('');
+    const toolOptions = ['claude', 'codex', 'shell'].map((x) => `<option value="${x}" ${p.tool === x ? 'selected' : ''}>${x}</option>`).join('');
+    return `<article class="ai-profile" data-profile="${escapeHtml(p.id)}">
+      <div class="ai-profile-head">
+        <div>
+          <b>${escapeHtml(p.name)}</b>
+          <span>${escapeHtml(p.provider)} · ${escapeHtml(p.tool)}${p.apiKeySet ? ` · ${escapeHtml(p.apiKeyPreview)}` : ' · 未录入 Key'}</span>
+        </div>
+        <button data-launch-profile="${escapeHtml(p.id)}">加载到终端</button>
+      </div>
+      <div class="ai-form-grid">
+        <label>名称<input data-field="name" value="${escapeHtml(p.name)}"></label>
+        <label>Provider<select data-field="provider">${providerOptions}</select></label>
+        <label>工具<select data-field="tool">${toolOptions}</select></label>
+        <label>模型<input data-field="model" placeholder="例如 sonnet / gpt-5 / deepseek-chat" value="${escapeHtml(p.model || '')}"></label>
+        <label>Base URL<input data-field="baseUrl" placeholder="OpenAI-compatible 可填 https://api.deepseek.com/v1" value="${escapeHtml(p.baseUrl || '')}"></label>
+        <label>API Key<input data-field="apiKey" type="password" placeholder="${p.apiKeySet ? '留空表示保留现有 Key' : '粘贴 API Key，本机保存'}"></label>
+      </div>
+      <textarea data-field="note" placeholder="这个 profile 的用途说明">${escapeHtml(p.note || '')}</textarea>
+      <div class="ai-profile-actions">
+        <button class="primary" data-save-profile="${escapeHtml(p.id)}">保存</button>
+        <button data-clear-key="${escapeHtml(p.id)}">清除 Key</button>
+      </div>
+    </article>`;
+  },
+  render() {
+    const body = this.ov && this.ov.querySelector('.botcom-body');
+    if (!body) return;
+    const d = this.data || {};
+    if (!d.ok) {
+      body.innerHTML = `<div class="empty-state">AI 设置读取失败：${escapeHtml(d.error || 'unknown')}</div>`;
+      return;
+    }
+    body.innerHTML = `
+      <section class="botcom-card">
+        <div class="botcom-card-title">本机工具检测</div>
+        ${this.toolLine('Claude Code', d.tools?.claude)}
+        ${this.toolLine('Codex CLI', d.tools?.codex)}
+        ${this.toolLine('Shell / OpenAI-compatible', d.tools?.shell)}
+        <div class="botcom-sub">Claude Code 官方使用 Anthropic API；DeepSeek 属于 OpenAI-compatible profile，适合 Codex、代理层或支持 OPENAI_API_KEY / OPENAI_BASE_URL 的工具。</div>
+        <div class="botcom-sub mono">Profiles: ${escapeHtml(d.path || '')}</div>
+      </section>
+      <section class="ai-profile-list">
+        ${(d.profiles || []).map((p) => this.profileCard(p)).join('')}
+      </section>
+    `;
+    body.querySelectorAll('[data-save-profile]').forEach((btn) => btn.addEventListener('click', () => this.save(btn.closest('.ai-profile'), false)));
+    body.querySelectorAll('[data-clear-key]').forEach((btn) => btn.addEventListener('click', () => this.save(btn.closest('.ai-profile'), true)));
+    body.querySelectorAll('[data-launch-profile]').forEach((btn) => btn.addEventListener('click', () => this.launch(btn.dataset.launchProfile)));
+  },
+  fields(card) {
+    const out = { id: card.dataset.profile };
+    card.querySelectorAll('[data-field]').forEach((el) => { out[el.dataset.field] = el.value; });
+    return out;
+  },
+  async save(card, clear) {
+    if (!card) return;
+    const data = this.fields(card);
+    if (clear && !(await confirmDialog(`确认清除 ${data.name || data.id} 的 API Key？`))) return;
+    const body = { ...data };
+    if (!body.apiKey) delete body.apiKey;
+    if (clear) body.clearApiKey = true;
+    const r = await apiPost('/api/botcom/ai-profiles', body).catch((err) => ({ ok: false, error: err.message }));
+    if (!r.ok) return toast(r.error || '保存失败', true);
+    toast(clear ? 'API Key 已清除' : 'AI profile 已保存');
+    await this.refresh();
+  },
+  async launch(profileId) {
+    const r = await apiPost('/api/botcom/ai-launch', { profileId }).catch((err) => ({ ok: false, error: err.message }));
+    if (!r.ok) return toast(r.error || '启动命令生成失败', true);
+    if (term.available()) {
+      term.runInDir(r.cwd || state.home, r.cmd, r.label || 'AI profile 已加载');
+      if (this.ov) this.ov.remove();
+      this.ov = null;
+    } else {
+      navigator.clipboard?.writeText(r.cmd);
+      toast('网页环境没有内嵌终端，已复制命令');
+    }
+  },
+};
+
 // ---------- 首次引导 ----------
 function maybeShowGuide() {
   if (localStorage.getItem('botcom_guided')) return;
@@ -2277,15 +2486,17 @@ function maybeShowGuide() {
     <p>企业级一人公司 OS——把获客、内容、交付、客户、收入、资产和自动化复盘放在一个桌面驾驶舱：</p>
     <ul>
       <li>侧边栏 <b>BotCom OS</b> 是经营控制台：老板只做关键审批，AI 员工负责生产、整理、执行和复盘</li>
+      <li><b>Agent</b> 是 AI 员工；<b>Skill</b> 是专业技能包；<b>模型/API</b> 是大脑和电费卡。第一次用先点侧边栏“AI 入门”。</li>
       <li><b>⌘K</b> 全局搜文件和文件夹；<b>⌘↵</b> 把项目直接在编辑器整包打开；<code>内容:关键词</code> 搜文件里的字</li>
       <li>顶部 <b>终端</b> 按钮开内嵌终端跑 Claude Code 等 agent；<b>把文件/文件夹拖进终端</b> 即插入路径喂给它当上下文</li>
       <li><b>单击</b> 预览，<b>双击</b> 系统打开；预览里 <b>编辑</b> md 走所见即所得、<b>编辑图片</b> 可标注/打码/转格式</li>
       <li>agent 改了哪些文件、内容队列是否可发布、服务是否在跑，都能在一个窗口里审核</li>
     </ul>
-    <button id="guide-ok">进入工作台</button>
+    <div class="guide-actions"><button id="guide-ai">先看 AI 入门</button><button id="guide-ok">进入工作台</button></div>
   </div>`;
   document.body.appendChild(ov);
   $('#guide-ok').onclick = () => { localStorage.setItem('botcom_guided', '1'); ov.remove(); };
+  $('#guide-ai').onclick = () => { localStorage.setItem('botcom_guided', '1'); ov.remove(); aiGuide.show(); };
 }
 
 // ---------- 预览面板拖拽调宽 ----------
@@ -2390,6 +2601,8 @@ function bindEvents() {
   $('#term-codex').onclick = () => term.launchAgent('codex');
   usagePanel.bind();
   shotTray.init();
+  $('#ai-guide-entry').onclick = () => aiGuide.show();
+  $('#ai-settings-entry').onclick = () => aiSettings.show();
   $('#skills-entry').onclick = () => skillsView.show();
   $('#botcom-entry').onclick = () => botcomDashboard.show();
   $('#term-newtab').onclick = () => term.newTab();

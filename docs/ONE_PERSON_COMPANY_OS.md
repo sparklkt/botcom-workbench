@@ -17,9 +17,9 @@ BotCom Workbench is not only a social media publishing helper. It is a local ope
 | Positioning / Offers | niche, ICP, promise, product ladder, constraints | workbench asset library |
 | Acquisition / Growth | channel strategy, trend capture, experiments, lead flow | content acquisition queue |
 | Content / Distribution | topics, scripts, images, videos, approval, publish-prep | media-ops review adapter |
-| Customer / Community | comments, private messages, tags, follow-ups, support | planned CRM adapter |
+| Customer / Community | comments, private messages, tags, follow-ups, support | local CRM adapter JSON |
 | Delivery / Projects | client work, SOPs, checklists, acceptance evidence | workbench project files |
-| Revenue / Monetization | products, affiliate/commerce/service revenue, costs | planned P&L adapter |
+| Revenue / Monetization | products, affiliate/commerce/service revenue, costs | local revenue/P&L adapter JSON |
 | Assets / Knowledge | prompts, templates, cases, media assets, datasets | AI-Workbench roots and indexes |
 | Automation / Review | workers, notifications, metrics collection, retrospectives | local service status and growth review |
 
@@ -67,3 +67,13 @@ Adapters should be added as small, auditable integrations:
 - `metrics` provider: imports platform, CRM, revenue, or delivery data for retrospectives.
 
 The public repository includes the desktop cockpit, local API, notification bridge, and the first content-operations adapter contract.
+
+## Beginner concepts
+
+- **Agent**: an AI worker that can talk, read context, and perform tasks through tools. Examples: Claude Code and Codex.
+- **Skill**: a reusable specialist capability for an agent, such as spreadsheet analysis, document editing, browser testing, image generation, or video rendering.
+- **Model**: the underlying brain used by an agent or workflow. Stronger models are better for complex reasoning; cheaper models are useful for drafts and classification.
+- **API key**: a private credential that pays for model usage. Store it locally and never commit it to Git.
+- **Profile**: a local BotCom configuration that connects a tool, model, base URL, and API key without exposing the key in the UI.
+
+The desktop app includes an **AI Beginner** panel and a **Model / API** panel so a non-technical operator can learn these concepts and configure tools without editing dotfiles first.

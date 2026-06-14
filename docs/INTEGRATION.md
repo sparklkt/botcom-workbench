@@ -126,3 +126,76 @@ Additional one-person company adapters should follow the same local-first patter
 3. expose reviewable queue items only when human approval is needed;
 4. keep credentials and private account data outside this repository;
 5. make all irreversible actions explicit and allowlisted.
+
+## Local operating adapter JSON
+
+For simple integrations, no server is required. Put one JSON file per module under:
+
+```text
+$BOTCOM_ADAPTERS_ROOT
+```
+
+Default:
+
+```text
+~/BotCom/adapters
+```
+
+Example:
+
+```json
+{
+  "id": "crm-lite",
+  "name": "CRM Lite",
+  "module": "customer",
+  "tone": "warn",
+  "metric": "12 leads",
+  "description": "Simple customer follow-up tracker exported from a spreadsheet.",
+  "next": "Follow up with 3 leads older than 48 hours.",
+  "updated_at": "2026-06-14T12:00:00Z",
+  "counts": {
+    "leads": 12,
+    "needs_reply": 3
+  },
+  "queue": {
+    "rows": 12,
+    "review": 3,
+    "blocked": 0
+  },
+  "warnings": [
+    "No owner reply SLA is configured."
+  ],
+  "next_actions": [
+    "Create a daily follow-up review queue."
+  ],
+  "links": [
+    {
+      "label": "Local CRM export",
+      "path": "~/BotCom/crm/leads.csv"
+    }
+  ]
+}
+```
+
+Allowed modules:
+
+```text
+positioning
+acquisition
+content
+customer
+delivery
+revenue
+assets
+automation
+```
+
+Allowed tones:
+
+```text
+good
+warn
+bad
+```
+
+BotCom only returns a safe allowlist of fields from adapter JSON. Do not put raw API keys or account passwords in adapter files.

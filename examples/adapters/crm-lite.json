@@ -1,0 +1,32 @@
+{
+  "id": "crm-lite",
+  "name": "CRM Lite",
+  "module": "customer",
+  "tone": "warn",
+  "metric": "12 leads",
+  "description": "Simple customer follow-up tracker exported from a spreadsheet.",
+  "next": "Follow up with 3 leads older than 48 hours.",
+  "updated_at": "2026-06-14T12:00:00Z",
+  "counts": {
+    "leads": 12,
+    "needs_reply": 3,
+    "customers": 2
+  },
+  "queue": {
+    "rows": 12,
+    "review": 3,
+    "blocked": 0
+  },
+  "warnings": [
+    "No reply SLA is configured."
+  ],
+  "next_actions": [
+    "Create a daily follow-up review queue."
+  ],
+  "links": [
+    {
+      "label": "Local CRM export",
+      "path": "~/BotCom/crm/leads.csv"
+    }
+  ]
+}

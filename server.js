@@ -19,6 +19,8 @@ const HOME = os.homedir();
 const PORT = Number(process.env.BOTCOM_WORKBENCH_PORT || process.env.PORT) || 4570;
 const CONFIG_DIR = path.join(HOME, '.botcom-workbench');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const AI_PROFILES_FILE = path.join(CONFIG_DIR, 'ai-profiles.json');
+const AI_ENV_DIR = path.join(CONFIG_DIR, 'ai-env');
 const THUMB_DIR = path.join(CONFIG_DIR, 'thumbs');
 const PUBLIC = path.join(__dirname, 'public');
 const PLATFORM = process.platform;
@@ -27,8 +29,29 @@ const BOTCOM_HOME = process.env.BOTCOM_HOME || path.join(HOME, 'BotCom');
 const BOTCOM_ROOTS = {
   workbench: process.env.BOTCOM_WORKBENCH_ROOT || path.join(BOTCOM_HOME, 'AI-Workbench'),
   mediaOps: process.env.BOTCOM_MEDIA_OPS_ROOT || path.join(BOTCOM_HOME, 'media-ops'),
+  adapters: process.env.BOTCOM_ADAPTERS_ROOT || path.join(BOTCOM_HOME, 'adapters'),
   app: __dirname,
 };
+const BOTCOM_MODULES = [
+  ['positioning', '定位 / 产品'],
+  ['acquisition', '获客 / 增长'],
+  ['content', '内容 / 分发'],
+  ['customer', '客户 / 社群'],
+  ['delivery', '交付 / 项目'],
+  ['revenue', '收入 / 商业化'],
+  ['assets', '资产 / 知识库'],
+  ['automation', '自动化 / 复盘'],
+];
+const BOTCOM_MODULE_ALIASES = new Map([
+  ['positioning', 'positioning'], ['strategy', 'positioning'], ['offer', 'positioning'], ['offers', 'positioning'], ['product', 'positioning'],
+  ['acquisition', 'acquisition'], ['growth', 'acquisition'], ['lead', 'acquisition'], ['leads', 'acquisition'], ['marketing', 'acquisition'],
+  ['content', 'content'], ['media', 'content'], ['distribution', 'content'], ['publishing', 'content'],
+  ['customer', 'customer'], ['customers', 'customer'], ['crm', 'customer'], ['community', 'customer'], ['support', 'customer'],
+  ['delivery', 'delivery'], ['project', 'delivery'], ['projects', 'delivery'], ['fulfillment', 'delivery'],
+  ['revenue', 'revenue'], ['monetization', 'revenue'], ['sales', 'revenue'], ['finance', 'revenue'], ['pnl', 'revenue'],
+  ['assets', 'assets'], ['asset', 'assets'], ['knowledge', 'assets'], ['knowledge_base', 'assets'], ['kb', 'assets'],
+  ['automation', 'automation'], ['automations', 'automation'], ['ops', 'automation'], ['review', 'automation'], ['intelligence', 'automation'],
+]);
 
 // 搜索 / 遍历时跳过的重目录，避免 vibe coding 项目里 node_modules 拖垮速度
 const IGNORE_DIRS = new Set([
@@ -523,6 +546,195 @@ async function findAgentBin(name) {
       resolve(!err && out && out.startsWith('/') ? out : null);
     });
   });
+}
+
+// ---------- AI 工具 / 模型配置：本地保存、API 脱敏、终端通过 env 脚本加载 ----------
+function defaultAiProfiles() {
+  return [
+    {
+      id: 'claude-anthropic',
+      name: 'Claude Code / Anthropic',
+      provider: 'anthropic',
+      tool: 'claude',
+      model: 'sonnet',
+      baseUrl: '',
+      note: 'Claude Code 官方路径。适合代码、文件整理、长任务和本地项目协作。',
+    },
+    {
+      id: 'codex-openai',
+      name: 'Codex / OpenAI',
+      provider: 'openai',
+      tool: 'codex',
+      model: '',
+      baseUrl: '',
+      note: 'Codex CLI 路径。可用 -m/--model 指定模型；也可结合 Codex profile。',
+    },
+    {
+      id: 'deepseek-compatible',
+      name: 'DeepSeek / OpenAI-compatible',
+      provider: 'deepseek',
+      tool: 'shell',
+      model: 'deepseek-chat',
+      baseUrl: 'https://api.deepseek.com/v1',
+      note: 'OpenAI-compatible 环境变量档案。适合支持 OPENAI_API_KEY / OPENAI_BASE_URL 的工具或代理层。',
+    },
+  ];
+}
+function normalizeAiProvider(v) {
+  const s = String(v || '').toLowerCase();
+  if (['anthropic', 'openai', 'deepseek', 'custom'].includes(s)) return s;
+  return 'custom';
+}
+function normalizeAiTool(v) {
+  const s = String(v || '').toLowerCase();
+  if (['claude', 'codex', 'shell'].includes(s)) return s;
+  return 'shell';
+}
+function mergeDefaultAiProfiles(saved) {
+  const byId = new Map();
+  for (const p of defaultAiProfiles()) byId.set(p.id, p);
+  for (const p of Array.isArray(saved) ? saved : []) {
+    const id = safeText(p && p.id, 64).replace(/[^a-zA-Z0-9_.:-]/g, '-');
+    if (!id) continue;
+    byId.set(id, { ...(byId.get(id) || {}), ...p, id });
+  }
+  return [...byId.values()];
+}
+function sanitizeAiProfile(p) {
+  const key = p.apiKey || '';
+  return {
+    id: safeText(p.id, 64),
+    name: safeText(p.name || p.id, 90),
+    provider: normalizeAiProvider(p.provider),
+    tool: normalizeAiTool(p.tool),
+    model: safeText(p.model || '', 120),
+    baseUrl: safeText(p.baseUrl || '', 240),
+    note: safeText(p.note || '', 180),
+    apiKeySet: !!key,
+    apiKeyPreview: key ? `••••${String(key).slice(-4)}` : '',
+    updated_at: safeText(p.updated_at || '', 80),
+  };
+}
+async function readAiProfilesRaw() {
+  const raw = await readJsonFileSafe(AI_PROFILES_FILE, 256 * 1024);
+  const saved = raw.ok && raw.data && Array.isArray(raw.data.profiles) ? raw.data.profiles : [];
+  return mergeDefaultAiProfiles(saved);
+}
+async function writeAiProfilesRaw(profiles) {
+  await fsp.mkdir(CONFIG_DIR, { recursive: true });
+  const tmp = `${AI_PROFILES_FILE}.tmp-${process.pid}-${Date.now()}`;
+  await fsp.writeFile(tmp, JSON.stringify({ profiles }, null, 2), { mode: 0o600 });
+  await fsp.rename(tmp, AI_PROFILES_FILE);
+  await fsp.chmod(AI_PROFILES_FILE, 0o600).catch(() => {});
+}
+async function aiProfilesStatus() {
+  const [claude, codex] = await Promise.all([findAgentBin('claude'), findAgentBin('codex')]);
+  const profiles = await readAiProfilesRaw();
+  return {
+    ok: true,
+    path: AI_PROFILES_FILE,
+    envDir: AI_ENV_DIR,
+    tools: {
+      claude: { installed: !!claude, path: claude || '', supportsModelFlag: true, envKey: 'ANTHROPIC_API_KEY' },
+      codex: { installed: !!codex, path: codex || '', supportsModelFlag: true, envKey: 'OPENAI_API_KEY' },
+      shell: { installed: true, path: process.env.SHELL || '/bin/zsh', supportsModelFlag: false, envKey: 'custom' },
+    },
+    profiles: profiles.map(sanitizeAiProfile),
+  };
+}
+async function saveAiProfile(body) {
+  const id = safeText(body.id || '', 64).replace(/[^a-zA-Z0-9_.:-]/g, '-').replace(/^-+|-+$/g, '');
+  if (!id) return { ok: false, error: 'profile id required' };
+  const profiles = await readAiProfilesRaw();
+  const current = profiles.find((p) => p.id === id) || {};
+  const next = {
+    ...current,
+    id,
+    name: safeText(body.name || current.name || id, 90),
+    provider: normalizeAiProvider(body.provider || current.provider),
+    tool: normalizeAiTool(body.tool || current.tool),
+    model: safeText(body.model != null ? body.model : current.model || '', 120),
+    baseUrl: safeText(body.baseUrl != null ? body.baseUrl : current.baseUrl || '', 240),
+    note: safeText(body.note != null ? body.note : current.note || '', 180),
+    updated_at: new Date().toISOString(),
+  };
+  if (body.clearApiKey) delete next.apiKey;
+  else if (typeof body.apiKey === 'string' && body.apiKey.trim()) next.apiKey = body.apiKey.trim();
+  const out = profiles.filter((p) => p.id !== id);
+  out.push(next);
+  await writeAiProfilesRaw(out);
+  return { ok: true, profile: sanitizeAiProfile(next), profiles: out.map(sanitizeAiProfile) };
+}
+function envForAiProfile(p) {
+  const env = {};
+  if (p.provider === 'anthropic') {
+    if (p.apiKey) env.ANTHROPIC_API_KEY = p.apiKey;
+  } else if (p.provider === 'deepseek') {
+    if (p.apiKey) {
+      env.DEEPSEEK_API_KEY = p.apiKey;
+      env.OPENAI_API_KEY = p.apiKey;
+    }
+    env.OPENAI_BASE_URL = p.baseUrl || 'https://api.deepseek.com/v1';
+    env.OPENAI_API_BASE = env.OPENAI_BASE_URL;
+    if (p.model) env.OPENAI_MODEL = p.model;
+  } else if (p.provider === 'openai') {
+    if (p.apiKey) env.OPENAI_API_KEY = p.apiKey;
+    if (p.baseUrl) {
+      env.OPENAI_BASE_URL = p.baseUrl;
+      env.OPENAI_API_BASE = p.baseUrl;
+    }
+    if (p.model) env.OPENAI_MODEL = p.model;
+  }
+  env.BOTCOM_AI_PROFILE = p.id;
+  return env;
+}
+async function writeAiEnvScript(p) {
+  const env = envForAiProfile(p);
+  const secretKeys = Object.keys(env).filter((k) => /KEY|TOKEN|SECRET/i.test(k));
+  if (!secretKeys.length && !Object.keys(env).some((k) => k === 'OPENAI_BASE_URL' || k === 'OPENAI_MODEL')) {
+    return { ok: false, error: '先录入 API Key 或 base URL' };
+  }
+  await fsp.mkdir(AI_ENV_DIR, { recursive: true });
+  const file = path.join(AI_ENV_DIR, `${p.id}.env.sh`);
+  const lines = [
+    '# Generated by BotCom Workbench. Local-only; do not commit.',
+    ...Object.entries(env).map(([k, v]) => `export ${k}=${shellQuote(v)}`),
+    '',
+  ];
+  await fsp.writeFile(file, lines.join('\n'), { mode: 0o600 });
+  await fsp.chmod(file, 0o600).catch(() => {});
+  return { ok: true, file };
+}
+async function aiLaunchCommand(body) {
+  const id = safeText(body.profileId || body.id || '', 64);
+  const profiles = await readAiProfilesRaw();
+  const p = profiles.find((x) => x.id === id);
+  if (!p) return { ok: false, error: 'profile not found' };
+  const envScript = await writeAiEnvScript(p);
+  if (!envScript.ok) return envScript;
+  const tool = normalizeAiTool(body.tool || p.tool);
+  const model = safeText(body.model != null ? body.model : p.model || '', 120);
+  const src = `. ${shellQuote(envScript.file)}`;
+  let cmd = src;
+  if (tool === 'claude') {
+    const bin = await findAgentBin('claude');
+    if (!bin) return { ok: false, error: '未找到 claude 命令' };
+    cmd += ` && claude${model ? ` --model ${shellQuote(model)}` : ''}`;
+  } else if (tool === 'codex') {
+    const bin = await findAgentBin('codex');
+    if (!bin) return { ok: false, error: '未找到 codex 命令' };
+    cmd += ` && codex${model ? ` -m ${shellQuote(model)}` : ''}`;
+  } else {
+    cmd += ` && echo ${shellQuote(`BotCom AI profile "${p.name || p.id}" loaded. You can now run any compatible CLI in this terminal.`)}`;
+  }
+  return {
+    ok: true,
+    cwd: HOME,
+    cmd,
+    label: `${p.name || p.id} 已加载到终端`,
+    envScript: envScript.file,
+    profile: sanitizeAiProfile(p),
+  };
 }
 
 // 最近几次整理日志的一句话摘要，给 agent 当历史参照（日志由 agent 按 brief 约定写入）
@@ -1916,6 +2128,143 @@ function countBy(rows, key) {
     return acc;
   }, {});
 }
+function safeText(v, max = 220) {
+  if (v == null) return '';
+  return String(v).replace(/\s+/g, ' ').trim().slice(0, max);
+}
+function safeStringArray(v, maxItems = 8) {
+  const arr = Array.isArray(v) ? v : (v ? [v] : []);
+  return arr.slice(0, maxItems).map((x) => {
+    if (x && typeof x === 'object') {
+      return {
+        label: safeText(x.label || x.name || x.id || 'item', 80),
+        detail: safeText(x.detail || x.text || x.message || x.next_step || '', 220),
+      };
+    }
+    return safeText(x, 220);
+  }).filter(Boolean);
+}
+function safeCounts(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [k, val] of Object.entries(v).slice(0, 20)) {
+    const key = safeText(k, 40).replace(/[^a-zA-Z0-9_.:-]/g, '_');
+    if (!key) continue;
+    if (typeof val === 'number' && Number.isFinite(val)) out[key] = val;
+    else if (typeof val === 'string') out[key] = safeText(val, 80);
+    else if (typeof val === 'boolean') out[key] = val;
+  }
+  return out;
+}
+function normalizeTone(v) {
+  const s = String(v || '').toLowerCase().trim();
+  if (['good', 'ok', 'pass', 'ready', 'running', 'healthy', 'green', 'active'].includes(s)) return 'good';
+  if (['warn', 'warning', 'review', 'pending', 'partial', 'yellow', 'attention'].includes(s)) return 'warn';
+  if (['bad', 'block', 'blocked', 'fail', 'failed', 'error', 'red', 'stopped', 'missing'].includes(s)) return 'bad';
+  return 'warn';
+}
+function normalizeModule(v) {
+  const key = String(v || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+  return BOTCOM_MODULE_ALIASES.get(key) || null;
+}
+function normalizeAdapter(file, raw, stat) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const module = normalizeModule(raw.module || raw.category || raw.type);
+  if (!module) return null;
+  const id = safeText(raw.id || path.basename(file, '.json'), 64).replace(/[^a-zA-Z0-9_.:-]/g, '-').replace(/^-+|-+$/g, '') || path.basename(file, '.json');
+  const queue = raw.queue && typeof raw.queue === 'object' ? raw.queue : {};
+  const links = Array.isArray(raw.links) ? raw.links : [];
+  return {
+    id,
+    module,
+    name: safeText(raw.name || raw.label || id, 80),
+    tone: normalizeTone(raw.tone || raw.status || raw.health),
+    metric: safeText(raw.metric || raw.summary || raw.value || '', 80),
+    desc: safeText(raw.desc || raw.description || raw.purpose || '', 180),
+    next: safeText(raw.next || raw.next_action || raw.next_step || '', 180),
+    updated_at: safeText(raw.updated_at || raw.generated_at || raw.at || '', 80),
+    source_file: file,
+    source_mtime: stat.mtime || 0,
+    counts: safeCounts(raw.counts),
+    queue: {
+      rows: Number(queue.rows || queue.total || raw.queue_rows || 0) || 0,
+      review: Number(queue.review || queue.pending || raw.review_rows || 0) || 0,
+      blocked: Number(queue.blocked || queue.block || raw.blocked_rows || 0) || 0,
+    },
+    blockers: safeStringArray(raw.blockers || raw.blocks, 6),
+    warnings: safeStringArray(raw.warnings || raw.warns, 6),
+    next_actions: safeStringArray(raw.next_actions, 6),
+    links: links.slice(0, 6).map((x) => ({
+      label: safeText(x && (x.label || x.name) || 'link', 50),
+      url: safeText(x && x.url || '', 240),
+      path: safeText(x && x.path || '', 240),
+    })).filter((x) => x.label && (x.url || x.path)),
+  };
+}
+function aggregateAdapterModule(id, label, adapters) {
+  const tones = adapters.map((x) => x.tone);
+  const tone = tones.includes('bad') ? 'bad' : (tones.includes('warn') ? 'warn' : (tones.includes('good') ? 'good' : 'warn'));
+  const queueRows = adapters.reduce((n, x) => n + (x.queue?.rows || 0), 0);
+  const reviewRows = adapters.reduce((n, x) => n + (x.queue?.review || 0), 0);
+  const blockedRows = adapters.reduce((n, x) => n + (x.queue?.blocked || 0), 0);
+  const metric = adapters.length
+    ? [adapters.length + ' adapters', reviewRows ? `${reviewRows} review` : '', blockedRows ? `${blockedRows} blocked` : '', queueRows && !reviewRows ? `${queueRows} rows` : ''].filter(Boolean).join(' · ')
+    : 'not connected';
+  const primary = adapters.find((x) => x.next) || adapters[0] || null;
+  return {
+    id,
+    label,
+    tone: adapters.length ? tone : 'bad',
+    metric,
+    connected: adapters.length,
+    queue: { rows: queueRows, review: reviewRows, blocked: blockedRows },
+    next: primary ? primary.next : '',
+    adapters: adapters.map((x) => ({ id: x.id, name: x.name, tone: x.tone, metric: x.metric })),
+  };
+}
+async function readOperatingAdapters() {
+  const root = BOTCOM_ROOTS.adapters;
+  const stat = fileStatSafe(root);
+  const errors = [];
+  const adapters = [];
+  if (stat.exists && stat.isDir) {
+    let files = [];
+    try {
+      files = (await fsp.readdir(root))
+        .filter((f) => /^[a-zA-Z0-9_.-]+\.json$/.test(f))
+        .sort()
+        .slice(0, 60);
+    } catch (err) {
+      errors.push({ file: '', error: safeText(err.message, 120) });
+    }
+    for (const f of files) {
+      const full = path.join(root, f);
+      const data = await readJsonFileSafe(full, 128 * 1024);
+      if (!data.ok) {
+        errors.push({ file: f, error: safeText(data.error, 120) });
+        continue;
+      }
+      const item = normalizeAdapter(f, data.data, data);
+      if (!item) {
+        errors.push({ file: f, error: 'invalid adapter module or shape' });
+        continue;
+      }
+      adapters.push(item);
+    }
+  }
+  const modules = {};
+  for (const [id, label] of BOTCOM_MODULES) {
+    modules[id] = aggregateAdapterModule(id, label, adapters.filter((x) => x.module === id));
+  }
+  return {
+    path: root,
+    exists: stat.exists && stat.isDir,
+    count: adapters.length,
+    modules,
+    adapters,
+    errors,
+  };
+}
 function processAlive(pid) {
   if (!pid) return false;
   try { process.kill(Number(pid), 0); return true; } catch { return false; }
@@ -1967,7 +2316,7 @@ async function botcomStatus() {
   const mobileMdPath = path.join(mediaOps, 'runtime', 'mobile_entry.md');
   const pkgPath = path.join(__dirname, 'package.json');
 
-  const [manifest, launch, growth, queueText, mobileText, pkg, reviewPid, workerPid] = await Promise.all([
+  const [manifest, launch, growth, queueText, mobileText, pkg, reviewPid, workerPid, operatingAdapters] = await Promise.all([
     readJsonFileSafe(manifestPath),
     readJsonFileSafe(launchPath),
     readJsonFileSafe(growthPath),
@@ -1976,6 +2325,7 @@ async function botcomStatus() {
     readJsonFileSafe(pkgPath, 128 * 1024),
     readPidSafe('review'),
     readPidSafe('worker'),
+    readOperatingAdapters(),
   ]);
 
   const queueRows = queueText.ok ? parseCsvLoose(queueText.text) : [];
@@ -1990,6 +2340,7 @@ async function botcomStatus() {
       app: BOTCOM_ROOTS.app,
       workbench,
       mediaOps,
+      adapters: BOTCOM_ROOTS.adapters,
     },
     app: {
       version: pkg.ok && pkg.data ? pkg.data.version : '',
@@ -2007,6 +2358,7 @@ async function botcomStatus() {
       missing: manifestItems.filter((x) => x.source_exists === false).length,
       sensitiveExcluded: fileStatSafe(path.join(workbench, '90_Sensitive_Local_Do_Not_Upload')).exists,
     },
+    operatingAdapters,
     mediaOps: {
       path: mediaOps,
       exists: fileStatSafe(mediaOps).exists,
@@ -2172,6 +2524,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/botcom/review-action' && req.method === 'POST') {
       return sendJSON(res, 200, await botcomReviewAction(await readBody(req)));
+    }
+    if (p === '/api/botcom/ai-profiles') {
+      if (req.method === 'POST') return sendJSON(res, 200, await saveAiProfile(await readBody(req)));
+      return sendJSON(res, 200, await aiProfilesStatus());
+    }
+    if (p === '/api/botcom/ai-launch' && req.method === 'POST') {
+      return sendJSON(res, 200, await aiLaunchCommand(await readBody(req)));
     }
     if (p === '/api/list') {
       return sendJSON(res, 200, await listDir(qp.get('path') || HOME));

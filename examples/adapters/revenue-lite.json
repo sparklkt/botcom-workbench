@@ -1,0 +1,32 @@
+{
+  "id": "revenue-lite",
+  "name": "Revenue Lite",
+  "module": "revenue",
+  "tone": "bad",
+  "metric": "$0 tracked",
+  "description": "Minimal revenue and monetization tracker for a one-person company.",
+  "next": "Connect orders, affiliate income, service invoices, or product sales.",
+  "updated_at": "2026-06-14T12:00:00Z",
+  "counts": {
+    "orders": 0,
+    "open_invoices": 0,
+    "monthly_costs": 0
+  },
+  "queue": {
+    "rows": 0,
+    "review": 0,
+    "blocked": 1
+  },
+  "blockers": [
+    "No revenue source is connected yet."
+  ],
+  "next_actions": [
+    "Create a simple P&L sheet and export a summary JSON into the adapters folder."
+  ],
+  "links": [
+    {
+      "label": "Revenue sheet",
+      "path": "~/BotCom/revenue/pnl.csv"
+    }
+  ]
+}

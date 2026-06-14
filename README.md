@@ -48,8 +48,11 @@ Core operating modules:
 - BotCom OS dashboard in the sidebar:
   - operating-state snapshot;
   - eight-module one-person company map;
+  - local operating adapters for CRM, delivery, revenue, assets, and automation;
   - approval queues and mobile approval links;
   - service health, blockers, next actions, and review suggestions.
+- AI beginner guide explaining agents, skills, models, API keys, context, and approval queues.
+- Model / API profile panel for Claude Code, Codex, Anthropic, OpenAI-compatible, and DeepSeek-style setups.
 - Review queue API integration:
   - `GET /api/botcom/status`
   - `GET /api/botcom/review-state`
@@ -106,6 +109,7 @@ BotCom Workbench is local-first. By default it uses:
 BOTCOM_HOME=~/BotCom
 BOTCOM_MEDIA_OPS_ROOT=~/BotCom/media-ops
 BOTCOM_WORKBENCH_ROOT=~/BotCom/AI-Workbench
+BOTCOM_ADAPTERS_ROOT=~/BotCom/adapters
 BOTCOM_WORKBENCH_PORT=4570
 ```
 
@@ -119,6 +123,14 @@ npm run app
 ```
 
 See `.env.example` and `docs/CONFIGURATION.md`.
+
+## AI tools and model profiles
+
+The in-app **Model / API** panel detects local `claude` and `codex` commands, stores local model profiles, and can load a selected profile into the embedded terminal.
+
+Profiles are stored under `~/.botcom-workbench` and raw API keys are not returned by the dashboard API.
+
+Claude Code's official path uses Anthropic credentials. DeepSeek and other OpenAI-compatible providers can be configured as terminal profiles for tools or proxies that support `OPENAI_API_KEY` and `OPENAI_BASE_URL`.
 
 ## Optional media-ops integration
 

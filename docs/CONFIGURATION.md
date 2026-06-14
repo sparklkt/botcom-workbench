@@ -10,6 +10,7 @@ Default values:
 BOTCOM_HOME=~/BotCom
 BOTCOM_MEDIA_OPS_ROOT=~/BotCom/media-ops
 BOTCOM_WORKBENCH_ROOT=~/BotCom/AI-Workbench
+BOTCOM_ADAPTERS_ROOT=~/BotCom/adapters
 ```
 
 Use custom paths when your operating workspace or first content-operations adapter lives elsewhere:
@@ -18,6 +19,7 @@ Use custom paths when your operating workspace or first content-operations adapt
 export BOTCOM_HOME="$HOME/BotCom"
 export BOTCOM_MEDIA_OPS_ROOT="$HOME/BotCom/media-ops"
 export BOTCOM_WORKBENCH_ROOT="$HOME/BotCom/AI-Workbench"
+export BOTCOM_ADAPTERS_ROOT="$HOME/BotCom/adapters"
 ```
 
 ## Ports
@@ -72,3 +74,37 @@ process environment
 ```
 
 Do not commit `.env`.
+
+## AI model / API profiles
+
+The in-app **Model / API** panel stores profiles under:
+
+```text
+~/.botcom-workbench/ai-profiles.json
+~/.botcom-workbench/ai-env/
+```
+
+The UI never prints the raw API key back. When you click **Load to terminal**, BotCom writes a local `0600` env script and runs a command like:
+
+```bash
+. ~/.botcom-workbench/ai-env/deepseek-compatible.env.sh && codex -m deepseek-chat
+```
+
+Supported profile types:
+
+- `anthropic` for Claude Code through `ANTHROPIC_API_KEY`;
+- `openai` for OpenAI-compatible tools through `OPENAI_API_KEY`;
+- `deepseek` for DeepSeek/OpenAI-compatible tools through `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, and `OPENAI_BASE_URL`;
+- `custom` for manual terminal use.
+
+Claude Code's official path is Anthropic. DeepSeek should be used through OpenAI-compatible tools or a compatibility/proxy layer that understands the same environment variables.
+
+## Operating adapters
+
+Place local adapter JSON files in:
+
+```text
+$BOTCOM_ADAPTERS_ROOT
+```
+
+Each file should describe one business module such as CRM, revenue, delivery, assets, or automation. See `examples/adapters/` and `docs/INTEGRATION.md`.
