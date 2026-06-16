@@ -49,6 +49,7 @@ Core operating modules:
   - operating-state snapshot;
   - eight-module one-person company map;
   - local operating adapters for CRM, delivery, revenue, assets, and automation;
+  - Growth Autopilot benchmark panel for social-media operating loops;
   - approval queues and mobile approval links;
   - service health, blockers, next actions, and review suggestions.
 - AI beginner guide explaining agents, skills, models, API keys, context, and approval queues.
@@ -172,6 +173,8 @@ BotCom Workbench only proxies to `127.0.0.1`; it does not accept arbitrary backe
 
 See `docs/INTEGRATION.md`.
 
+For the Growth Autopilot loop and social-media benchmark model, see `docs/GROWTH_AUTOPILOT.md`.
+
 For the broader product model, see `docs/ONE_PERSON_COMPANY_OS.md`.
 
 ## Notifications
@@ -215,6 +218,7 @@ See `docs/SECURITY.md`.
 
 - `docs/ARCHITECTURE.md`
 - `docs/CONFIGURATION.md`
+- `docs/GROWTH_AUTOPILOT.md`
 - `docs/INTEGRATION.md`
 - `docs/ONE_PERSON_COMPANY_OS.md`
 - `docs/PUBLISHING.md`

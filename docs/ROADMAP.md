@@ -15,6 +15,7 @@
 - Installer-friendly first-run setup.
 - In-app environment configuration screen.
 - Optional sample media-ops workspace generator.
+- Growth Autopilot panel: public workflow benchmark, capability matrix, missing-credential checklist, and loop rerun command.
 - Better empty-state guidance when no operating adapters are configured.
 - Adapter contracts for CRM, delivery, revenue, assets, and metrics.
 - Signed and notarized macOS release.
