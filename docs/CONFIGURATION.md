@@ -63,6 +63,37 @@ WECHAT_BOT_WEBHOOK=
 WECHAT_WEBHOOK=
 ```
 
+## Growth Autopilot connectors
+
+These variables are optional until you enable the related connector. Keep real values in local `.env` or the OS keychain; do not commit them.
+
+```text
+# X API
+X_API_KEY=
+X_API_SECRET=
+X_ACCESS_TOKEN=
+X_ACCESS_TOKEN_SECRET=
+X_BEARER_TOKEN=
+
+# Image generation
+OPENAI_API_KEY=
+OPENAI_IMAGE_MODEL=gpt-image-1
+
+# Video generation
+SEEDANCE_API_TOKEN=
+VOLCENGINE_ACCESS_KEY_ID=
+VOLCENGINE_SECRET_ACCESS_KEY=
+
+# Reddit trend ingestion / approved posting
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+REDDIT_REFRESH_TOKEN=
+REDDIT_USER_AGENT=botcom-workbench-local/0.1
+
+# Local browser-assisted domestic-platform workflows
+MEDIA_OPS_BROWSER_PROFILE_DIR=$HOME/BotCom/browser-profile
+```
+
 ## Local env files
 
 The notification bridge reads, in order:

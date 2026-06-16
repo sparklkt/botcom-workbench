@@ -2398,14 +2398,16 @@ async function botcomStatus() {
   const manifestPath = path.join(workbench, '_indexes', 'workbench_manifest.json');
   const launchPath = path.join(mediaOps, 'reports', 'launch_readiness.json');
   const growthPath = path.join(mediaOps, 'reports', 'growth_snapshot.json');
+  const autopilotPath = path.join(mediaOps, 'reports', 'growth_autopilot.json');
   const queuePath = path.join(mediaOps, 'database', 'approval_queue.csv');
   const mobileMdPath = path.join(mediaOps, 'runtime', 'mobile_entry.md');
   const pkgPath = path.join(__dirname, 'package.json');
 
-  const [manifest, launch, growth, queueText, mobileText, pkg, reviewPid, workerPid, operatingAdapters] = await Promise.all([
+  const [manifest, launch, growth, autopilot, queueText, mobileText, pkg, reviewPid, workerPid, operatingAdapters] = await Promise.all([
     readJsonFileSafe(manifestPath),
     readJsonFileSafe(launchPath),
     readJsonFileSafe(growthPath),
+    readJsonFileSafe(autopilotPath),
     readTextFileSafe(queuePath),
     readTextFileSafe(mobileMdPath),
     readJsonFileSafe(pkgPath, 128 * 1024),
@@ -2452,6 +2454,7 @@ async function botcomStatus() {
       reviewDashboard: path.join(mediaOps, 'review_dashboard', 'index.html'),
       launchReadiness: launchSummary,
       growth: growth.ok ? growth.data : null,
+      growthAutopilot: autopilot.ok ? autopilot.data : null,
       queue: {
         file: queuePath,
         rows: queueRows.length,
@@ -2483,6 +2486,8 @@ async function botcomStatus() {
       { id: 'start-review', label: '启动手机审批台', cwd: mediaOps, cmd: 'python3 scripts/media_ops.py service start review' },
       { id: 'start-worker', label: '启动发布准备 worker', cwd: mediaOps, cmd: 'python3 scripts/media_ops.py service start worker' },
       { id: 'growth', label: '生成增长复盘', cwd: mediaOps, cmd: 'python3 scripts/media_ops.py analyze-growth' },
+      { id: 'growth-autopilot', label: '运行 Growth Autopilot Loop', cwd: mediaOps, cmd: 'python3 scripts/media_ops.py growth-autopilot run --loops 7 --json' },
+      { id: 'quality-gate', label: '运行内容质量门禁', cwd: mediaOps, cmd: 'python3 scripts/media_ops.py quality-gate' },
       { id: 'notify', label: '发送飞书/微信状态摘要', cwd: BOTCOM_ROOTS.app, cmd: 'python3 botcom/comms_bridge.py --status --channel all' },
     ],
   };

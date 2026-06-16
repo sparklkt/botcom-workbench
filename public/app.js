@@ -1880,8 +1880,9 @@ function hlTerm(text, term) {
 
 // ---------- BotCom OS：一人公司经营控制台 ----------
 const botcomDashboard = {
-  ov: null, data: null, review: null, reviewError: '',
-  async show() {
+  ov: null, data: null, review: null, reviewError: '', focus: '',
+  async show(focus = '') {
+    this.focus = focus;
     if (this.ov) this.ov.remove();
     const ov = document.createElement('div');
     this.ov = ov;
@@ -2177,6 +2178,48 @@ const botcomDashboard = {
       </div>
     </section>`;
   },
+  growthAutopilotSection(autopilot) {
+    if (!autopilot || !autopilot.score) {
+      return `<section class="botcom-card botcom-autopilot-card" id="growth-autopilot-workflow">
+        <div class="botcom-card-title">Growth Autopilot · 公开最佳工作流基准</div>
+        <div class="botcom-sub">尚未生成基准报告。运行 loop 后会对比 Postiz、n8n、Buffer、Publer 等公开方案，并列出 API / Cookie / 指标缺口。</div>
+        <div class="botcom-actions inline">
+          <button class="primary" data-cmd="growth-autopilot">运行 Growth Autopilot Loop</button>
+        </div>
+      </section>`;
+    }
+    const score = autopilot.score || {};
+    const caps = autopilot.capabilities || [];
+    const needs = autopilot.needs_from_owner || [];
+    const loops = autopilot.loops || [];
+    const verdict = score.verdict === 'architecturally_ahead' ? '架构和执行闭环已领先公开 scheduler' : '领先但仍需凭据和真实指标';
+    return `<section class="botcom-card botcom-autopilot-card" id="growth-autopilot-workflow">
+      <div class="botcom-card-title">Growth Autopilot · 公开最佳工作流基准</div>
+      <div class="botcom-score-row">
+        <div><span>BotCom Loop</span><b>${escapeHtml(score.botcom_after_loops ?? '—')}</b></div>
+        <div><span>公开最佳参考</span><b>${escapeHtml(score.best_public_reference ?? '—')}</b></div>
+        <div><span>领先差值</span><b class="${Number(score.margin || 0) > 0 ? 'good' : 'warn'}">${escapeHtml(score.margin ?? '—')}</b></div>
+      </div>
+      <div class="botcom-sub">${escapeHtml(verdict)}。这里比较的是“研究→生成→质检→审核→发布准备→复盘→下一轮实验”的完整经营闭环，不是单个发帖按钮。</div>
+      <div class="botcom-cap-grid">
+        ${caps.slice(0, 12).map((c) => `<div class="botcom-cap">
+          <span>${escapeHtml(c.label || c.id)}</span>
+          <b>${escapeHtml(c.score ?? '')}</b>
+          <em>${escapeHtml(c.next_step || '')}</em>
+        </div>`).join('')}
+      </div>
+      ${needs.length ? `<div class="botcom-card-title sub-title">需要你后续提供 / 登录</div><div class="botcom-needs">
+        ${needs.map((n) => `<div class="botcom-need"><b>${escapeHtml(n.label || n.id)}</b><span>${escapeHtml(n.why || '')}</span><em>${escapeHtml(n.fields || '')}</em></div>`).join('')}
+      </div>` : '<div class="botcom-ok">凭据和连接器已齐，可以进入真实发布 loop。</div>'}
+      <div class="botcom-card-title sub-title">最近 Loop</div>
+      <div class="botcom-list">${loops.slice(-4).map((l) => `<div>Loop ${escapeHtml(l.loop)} · score ${escapeHtml(l.score)} · ${escapeHtml(l.focus)}：${escapeHtml(l.finding)}</div>`).join('')}</div>
+      <div class="botcom-actions inline">
+        <button class="primary" data-cmd="growth-autopilot">重跑 Growth Loop</button>
+        <button data-open-autopilot="md">打开报告</button>
+        <button data-open-autopilot="benchmark">打开竞品基准</button>
+      </div>
+    </section>`;
+  },
   render() {
     const d = this.data || {};
     const body = this.ov && this.ov.querySelector('.botcom-body');
@@ -2185,6 +2228,7 @@ const botcomDashboard = {
     const w = d.workbench || {};
     const lr = m.launchReadiness || {};
     const growth = m.growth || {};
+    const autopilot = m.growthAutopilot || null;
     const queue = m.queue || {};
     const services = m.services || {};
     const op = d.operatingAdapters || {};
@@ -2241,6 +2285,8 @@ const botcomDashboard = {
 
       ${this.moduleMapSection(modules)}
 
+      ${this.growthAutopilotSection(autopilot)}
+
       ${this.queueSection(queue)}
 
       <div class="botcom-two">
@@ -2284,6 +2330,13 @@ const botcomDashboard = {
     });
     body.querySelector('[data-open-workbench]')?.addEventListener('click', () => (w.dashboard ? openWith(w.dashboard, 'default') : toast('AI-Workbench 未配置', true)));
     body.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => this.run(cmds.find((c) => c.id === b.dataset.cmd))));
+    body.querySelectorAll('[data-open-autopilot]').forEach((b) => b.addEventListener('click', () => {
+      const kind = b.dataset.openAutopilot;
+      const p = kind === 'benchmark'
+        ? this.mediaPath('research', 'latest_public_benchmark.md')
+        : this.mediaPath('reports', 'growth_autopilot.md');
+      openWith(p, 'default');
+    }));
     body.querySelectorAll('[data-botcom-day]').forEach((b) => b.addEventListener('click', () => {
       body.querySelectorAll('[data-botcom-day]').forEach((x) => x.classList.toggle('active', x === b));
       body.querySelectorAll('[data-q-day]').forEach((row) => row.classList.toggle('hidden', row.dataset.qDay !== b.dataset.botcomDay));
@@ -2291,6 +2344,12 @@ const botcomDashboard = {
     body.querySelectorAll('[data-q-open]').forEach((b) => b.addEventListener('click', () => this.openQueuePath(b.dataset.qOpen, b.dataset.day, b.dataset.platform)));
     body.querySelectorAll('[data-q-copy]').forEach((b) => b.addEventListener('click', () => this.copyQueueText(b.dataset.day, b.dataset.platform)));
     body.querySelectorAll('[data-review-action]').forEach((b) => b.addEventListener('click', () => this.reviewAction(b.dataset.reviewAction, b.dataset.day, b.dataset.platform)));
+    if (this.focus === 'growth') {
+      const target = body.querySelector('#growth-autopilot-workflow');
+      target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      target?.classList.add('botcom-focus-pulse');
+      window.setTimeout(() => target?.classList.remove('botcom-focus-pulse'), 1800);
+    }
   },
 };
 
@@ -2707,6 +2766,7 @@ function bindEvents() {
   $('#setup-entry').onclick = () => setupWizard.show();
   $('#skills-entry').onclick = () => skillsView.show();
   $('#botcom-entry').onclick = () => botcomDashboard.show();
+  $('#growth-entry').onclick = () => botcomDashboard.show('growth');
   $('#term-newtab').onclick = () => term.newTab();
   $('#term-max').onclick = () => term.toggleMax();
   $('#term-dock').onclick = () => term.setDock(term.dock === 'bottom' ? 'right' : 'bottom');
